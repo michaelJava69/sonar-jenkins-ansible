@@ -1,0 +1,67 @@
+---
+- hosts: jenkins
+  become: true
+
+  roles:
+    - role: jdauphant.ssl-certs
+   #   ssl_certs_local_cert_data: "{{vault_cert_data}}"
+   #   ssl_certs_local_privkey_data: "{{vault_privkey_data}}"
+    - role: jdauphant.nginx
+      nginx_configs:
+        ssl:
+        - ssl_certificate_key {{ssl_certs_privkey_path}}
+        - ssl_certificate     {{ssl_certs_cert_path}}
+
+  tasks:
+    - name: Add the webupd8team Java PPA
+      apt_repository:
+        # repo: ppa:webupd8team/java
+        repo: ppa:openjdk-r/ppa
+
+    - name: Automatically select the Oracle License
+      shell: echo debconf shared/accepted-oracle-license-v1-1 select true | sudo debconf-set-selections
+
+    - name: Install Java 8 & PostgreSQL
+      package: name={{item}} state=present
+      with_items:
+        - openjdk-8-jre-headless
+        # - oracle-java8-installer
+        - postgresql
+        - postgresql-contrib
+        - unzip
+        - python3-psycopg2
+
+
+    - name: ensure the jenkins apt repository key is installed
+      apt_key: url=https://pkg.jenkins.io/debian-stable/jenkins.io.key state=present
+      become: yes
+
+    - name: ensure the repository is configured
+      apt_repository: repo='deb https://pkg.jenkins.io/debian-stable binary/' state=present
+      become: yes
+
+    - name: ensure jenkins is installed
+      apt: name=jenkins update_cache=yes
+      become: yes
+
+    - name: ensure jenkins is running
+      service: name=jenkins state=started
+    
+    - name: init password jenkin
+      shell: cat /var/lib/jenkins/secrets/initialAdminPassword  
+      changed_when: false
+      register: result
+
+    - name: detail init password jenkin
+      debug: 
+       var: result.stdout
+
+
+#    - name: init password jenkin
+#      shell: cat /var/lib/jenkins/secrets/initialAdminPassword
+#      changed_when: false
+#      register: result
+
+#    - name: print init password jenkins
+#      debug:
+#      var: result.stdout
